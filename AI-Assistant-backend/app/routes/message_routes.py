@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from uuid import UUID
 
+from app.utils.get_current_user import get_current_user
+from app.models.user import User
 from app.database import get_db
 from app.models.message import Message
 from app.models.chat_session import ChatSession
@@ -20,7 +22,12 @@ def get_messages(chat_id:UUID, db:Session=Depends(get_db)):
 
 
 @router.post("/{chat_id}/messages", response_model=AIReply)
-def send_message(chat_id: UUID, body: MessageCreate, db: Session = Depends(get_db)):
+def send_message(
+    chat_id: UUID, 
+    body: MessageCreate, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+    ):
 
     chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
 

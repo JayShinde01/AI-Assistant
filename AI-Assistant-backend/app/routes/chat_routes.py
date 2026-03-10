@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from uuid import  UUID 
-
+from app.models.user import User
+from app.utils.get_current_user import get_current_user
 from app.database import get_db
 from app.models.chat_session import ChatSession
 from app.schemas.chat_schema import ChatCreate, ChatResponse
@@ -9,7 +10,11 @@ from app.schemas.chat_schema import ChatCreate, ChatResponse
 router = APIRouter(prefix="/api/chats", tags=["Chats"])
 
 @router.post("/", response_model=ChatResponse)
-def create_chat(chat:ChatCreate, db: Session = Depends(get_db)):
+def create_chat(
+    chat:ChatCreate, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+    ):
     new_chat = ChatSession(
         title = chat.title,
         user_id = chat.user_id # here replace 0auth
@@ -23,8 +28,14 @@ def create_chat(chat:ChatCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/",response_model=list[ChatResponse])
-def get_chats(db: Session = Depends(get_db)):
-    chats = db.query(ChatSession).all()
+def get_chats(
+              db: Session = Depends(get_db),
+              current_user: User = Depends(get_current_user)
+              ):
+    chats = db.query(ChatSession).filter(
+        ChatSession.user_id == current_user.id
+    ).all()
+     
 
     return chats # later here need to filter by user id
 
