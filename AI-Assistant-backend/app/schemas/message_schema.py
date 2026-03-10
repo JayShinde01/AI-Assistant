@@ -7,7 +7,7 @@ class MessageCreate(BaseModel):
     message: str
 
 
-class MessageResponce(BaseModel):
+class MessageResponse(BaseModel):
     id : UUID
     role : str 
     message : str
