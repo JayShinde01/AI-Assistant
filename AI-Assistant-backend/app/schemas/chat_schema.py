@@ -4,7 +4,6 @@ from datetime import datetime
 
 class ChatCreate(BaseModel):
     title:str
-    user_id: UUID
 
 
 class ChatResponse(BaseModel):

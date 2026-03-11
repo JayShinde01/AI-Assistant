@@ -3,21 +3,24 @@ from app.config import GEMINI_API_KEY
 
 genai.configure(api_key=GEMINI_API_KEY)
 
-model = genai.GenerativeModel("models/gemini-2.5-flash")
-for m in genai.list_models():
-    print(m.name)
+model = genai.GenerativeModel("model/gemini-1.5-flash")
+
 
 def generate_ai_response(messages):
-    prompt = ""
 
-    for msg in messages:
-        if msg.role == "user":
-            prompt += f"User: {msg.message}\n"
-        else:
-            prompt += f"Assistant: {msg.message}\n"
-        
-    prompt += "Assistant:"
+    try:
 
-    response = model.generate_content(prompt)
+        prompt_parts = []
 
-    return response.text
+        for msg in messages:
+            prompt_parts.append({
+                "role": "user" if msg.role == "user" else "model",
+                "parts": [msg.message]
+            })
+
+        response = model.generate_content(prompt_parts)
+
+        return response.text
+
+    except Exception as e:
+        return "Sorry, AI service is temporarily unavailable."

@@ -16,7 +16,10 @@ router = APIRouter(prefix="/api/chats", tags=["Messages"])
 @router.get("/{chat_id}/messages")
 def get_messages(chat_id:UUID, db:Session=Depends(get_db)):
 
-    messages = db.query(Message).filter(Message.chat_id == chat_id).all()
+    messages = db.query(Message)\
+    .filter(Message.chat_id == chat_id)\
+    .order_by(Message.created_at)\
+    .all()
 
     return messages
 
@@ -29,11 +32,15 @@ def send_message(
     current_user: User = Depends(get_current_user)
     ):
 
-    chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
+    chat = db.query(ChatSession).filter(
+    ChatSession.id == chat_id,
+    ChatSession.user_id == current_user.id
+    ).first()
 
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
-
+    if not body.message.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
     # save user message
     user_message = Message(
         chat_id=chat_id,
@@ -43,9 +50,16 @@ def send_message(
 
     db.add(user_message)
     db.commit()
+    db.refresh(user_message)
 
     # fetch chat history
-    messages = db.query(Message).filter(Message.chat_id == chat_id).all()
+    messages = db.query(Message)\
+    .filter(Message.chat_id == chat_id)\
+    .order_by(Message.created_at.desc())\
+    .limit(20)\
+    .all()
+
+    messages.reverse()
 
     # generate AI response
     ai_text = generate_ai_response(messages)
@@ -59,5 +73,9 @@ def send_message(
 
     db.add(ai_message)
     db.commit()
+    db.refresh(ai_message)
 
-    return {"reply": ai_text}
+    return{
+    "reply": ai_text,
+    "chat_id": chat_id
+    }

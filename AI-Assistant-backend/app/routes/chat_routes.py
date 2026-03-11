@@ -11,13 +11,14 @@ router = APIRouter(prefix="/api/chats", tags=["Chats"])
 
 @router.post("/", response_model=ChatResponse)
 def create_chat(
-    chat:ChatCreate, 
+    chat: ChatCreate, 
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
-    ):
+):
+
     new_chat = ChatSession(
-        title = chat.title,
-        user_id = chat.user_id # here replace 0auth
+        title=chat.title,
+        user_id=current_user.id
     )
 
     db.add(new_chat)

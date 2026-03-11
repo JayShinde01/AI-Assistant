@@ -6,14 +6,14 @@ from app.services.auth_service import get_or_create_user
 
 
 def get_current_user(authorization: str = Header(...), db: Session = Depends(get_db)):
-
+    # print("authorization to check get current user", authorization)
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid token")
 
     token = authorization.split(" ")[1]
 
     user = get_or_create_user(token, db)
-
+    # print("print user ",user.email)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid Google token")
 
