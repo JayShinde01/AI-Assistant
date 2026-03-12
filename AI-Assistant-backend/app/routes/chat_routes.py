@@ -42,23 +42,39 @@ def get_chats(
 
 
 @router.put("/{chat_id}", response_model=ChatResponse)
-def update_chat(chat_id : UUID, chat : ChatCreate, db: Session = Depends(get_db)):
-    db_chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
+def update_chat(
+    chat_id: UUID,
+    chat: ChatCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+
+    db_chat = db.query(ChatSession).filter(
+        ChatSession.id == chat_id,
+        ChatSession.user_id == current_user.id
+    ).first()
 
     if not db_chat:
-        raise HTTPException(status_code=404, detail="Chat not found..!")
-    
+        raise HTTPException(status_code=404, detail="Chat not found")
+
     db_chat.title = chat.title
     db.commit()
     db.refresh(db_chat)
-    
+
     return db_chat
 
 
 @router.delete("/{chat_id}")
-def delete_chat(chat_id: UUID, db: Session = Depends(get_db)):
+def delete_chat(
+    chat_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
 
-    db_chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
+    db_chat = db.query(ChatSession).filter(
+        ChatSession.id == chat_id,
+        ChatSession.user_id == current_user.id
+    ).first()
 
     if not db_chat:
         raise HTTPException(status_code=404, detail="Chat not found")

@@ -1,32 +1,29 @@
 import React, { useState, useEffect } from "react";
+import { Layout } from "antd";
+import { useParams } from "react-router-dom";
+
 import ChatSidebar from "../components/ChatSidebar";
 import ChatWindow from "../components/ChatWindow";
 import ChatInput from "../components/ChatInput";
-import { useParams } from "react-router-dom";
 import API from "../services/api";
+
+const { Sider, Content } = Layout;
 
 function Home() {
 
   const [messages, setMessages] = useState([]);
   const { chatId } = useParams();
 
-  // load messages when chat changes
   useEffect(() => {
-
     if (!chatId) return;
 
     const loadMessages = async () => {
-
       const res = await API.get(`/chats/${chatId}/messages`);
-
       setMessages(res.data);
     };
 
     loadMessages();
-
   }, [chatId]);
-
-
 
   const handleSend = async (text) => {
 
@@ -38,28 +35,42 @@ function Home() {
     const aiMsg = { role: "assistant", message: res.data.reply };
 
     setMessages(prev => [...prev, userMsg, aiMsg]);
-
   };
-
 
   return (
 
-    <div style={{ display: "flex" }}>
+    <Layout style={{ height: "90vh" }}>
 
-      <ChatSidebar />
+      <Sider width={260} theme="light">
+        <ChatSidebar />
+      </Sider>
 
-      <div style={{
-        flex: 1,
-        padding: "20px"
-      }}>
+      <Layout>
 
-        <ChatWindow messages={messages} />
+        <Content
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            height: "100%",
+            padding: "20px"
+          }}
+        >
 
-        <ChatInput onSend={handleSend} />
+          {/* Chat Messages */}
+          <div style={{ flex: 1, overflowY: "auto" }}>
+            <ChatWindow messages={messages} />
+          </div>
 
-      </div>
+          {/* Input */}
+          <div style={{ marginTop: "10px" }}>
+            <ChatInput onSend={handleSend} />
+          </div>
 
-    </div>
+        </Content>
+
+      </Layout>
+
+    </Layout>
 
   );
 }

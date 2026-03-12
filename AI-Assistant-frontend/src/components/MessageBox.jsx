@@ -1,24 +1,41 @@
 import React from "react";
+import { Avatar, Space } from "antd";
+import { UserOutlined, RobotOutlined } from "@ant-design/icons";
 
 function MessageBox({ role, message }) {
 
-  return (
-    <div style={{
-      display: "flex",
-      justifyContent: role === "user" ? "flex-end" : "flex-start",
-      marginBottom: "10px"
-    }}>
-      
-      <div style={{
-        background: role === "user" ? "#4CAF50" : "#E0E0E0",
-        color: role === "user" ? "white" : "black",
-        padding: "10px",
-        borderRadius: "10px",
-        maxWidth: "60%"
-      }}>
-        {message}
-      </div>
+  const isUser = role === "user";
 
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: isUser ? "flex-end" : "flex-start",
+        marginBottom: 12
+      }}
+    >
+      <Space
+        direction={isUser ? "horizontal-reverse" : "horizontal"}
+        align="start"
+      >
+        <Avatar
+          icon={isUser ? <UserOutlined /> : <RobotOutlined />}
+        />
+
+        <div
+          style={{
+            background: isUser ? "#1677ff" : "#f5f5f5",
+            color: isUser ? "white" : "black",
+            padding: "10px 14px",
+            borderRadius: "10px",
+            maxWidth: "400px",
+            wordBreak: "break-word"
+          }}
+        >
+          {message}
+        </div>
+
+      </Space>
     </div>
   );
 }
