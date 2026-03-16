@@ -87,7 +87,7 @@ function Login() {
         </div>
 
         <Title level={3} style={{ marginBottom: 4 }}>AI Chat Assistant</Title>
-        <Text type="secondary" style={{ fontSize: 13 }}>Powered by Google Gemini</Text>
+        <Text type="secondary" style={{ fontSize: 13 }}>Powered by  Gemini</Text>
 
         {/* Feature pills */}
         <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", margin: "16px 0" }}>
