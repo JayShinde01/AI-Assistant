@@ -1,52 +1,75 @@
-from fastapi import APIRouter, Depends
+"""
+routes/auth_routes.py
+---------------------
+Authentication routes for the AI Assistant API.
+
+Endpoints:
+  POST /api/auth/google  → Verify Google OAuth token, return user info
+  GET  /api/auth/me      → Return current user info (requires auth)
+"""
+
+import logging
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+
 from app.database import get_db
-from app import models
-from app.schemas.auth_schema import GoogleAuth
-from google.oauth2 import id_token
-from google.auth.transport import requests
-import os
+from app.models.user import User
+from app.schemas.auth_schema import GoogleAuth, UserResponse
+from app.utils.get_current_user import get_current_user
+from app.services.auth_service import get_or_create_user
 
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api")
+# All routes in this file are prefixed with /api
+router = APIRouter(prefix="/api", tags=["Authentication"])
 
-print("in auth route")
 
-@router.post("/auth/google")
+@router.post("/auth/google", response_model=UserResponse)
 def google_login(data: GoogleAuth, db: Session = Depends(get_db)):
+    """
+    Verify a Google OAuth2 ID token and log the user in.
 
-    print("route called")
+    The frontend sends the raw credential token from the Google Sign-In button.
+    We verify it server-side, then create or retrieve the user from our database.
 
-    token = data.token
+    Returns:
+        UserResponse with user_id, email, name, and picture.
 
-    idinfo = id_token.verify_oauth2_token(
-        token,
-        requests.Request(),
-        GOOGLE_CLIENT_ID
-    )
+    Raises:
+        HTTPException 401: If the Google token is invalid or expired.
+    """
+    logger.info("Google login attempt received")
 
-    email = idinfo["email"]
-    google_id = idinfo["sub"]   # unique google id
-    picture = idinfo.get("picture")
-
-    user = db.query(models.User).filter(
-        models.User.email == email
-    ).first()
+    # Verify token and get/create user in one step
+    user = get_or_create_user(data.token, db)
 
     if not user:
-        user = models.User(
-            google_id=google_id,
-            email=email,
-            picture=picture
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired Google token. Please try logging in again.",
         )
 
-        db.add(user)
-        db.commit()
-        db.refresh(user)
+    logger.info(f"User logged in: {user.email}")
 
-    return {
-        "user_id": str(user.id),
-        "email": user.email,
-        "picture": user.picture
-    }
+    return UserResponse(
+        user_id=str(user.id),
+        email=user.email,
+        name=user.name,
+        picture=user.picture,
+    )
+
+
+@router.get("/auth/me", response_model=UserResponse)
+def get_me(current_user: User = Depends(get_current_user)):
+    """
+    Return the currently authenticated user's profile.
+
+    Useful for the frontend to refresh user info on page load.
+    Requires a valid Bearer token in the Authorization header.
+    """
+    return UserResponse(
+        user_id=str(current_user.id),
+        email=current_user.email,
+        name=current_user.name,
+        picture=current_user.picture,
+    )

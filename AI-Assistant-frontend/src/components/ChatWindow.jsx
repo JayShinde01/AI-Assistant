@@ -1,80 +1,64 @@
+/**
+ * components/ChatWindow.jsx
+ * -------------------------
+ * Scrollable message list — dark/light aware.
+ */
+
 import React, { useEffect, useRef } from "react";
-import { List, Avatar } from "antd";
-import { UserOutlined, RobotOutlined } from "@ant-design/icons";
+import { Typography } from "antd";
+import { RobotOutlined } from "@ant-design/icons";
 
-function ChatWindow({ messages }) {
+import MessageBox from "./MessageBox";
+import { useTheme } from "../context/ThemeContext";
 
+const { Text } = Typography;
+
+function ChatWindow({ messages, isLoading = false }) {
   const bottomRef = useRef(null);
+  const { isDark } = useTheme();
 
-  // auto scroll to latest message
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, isLoading]);
 
   return (
     <div
       style={{
         flex: 1,
         overflowY: "auto",
-        padding: "10px",
-        background: "#fafafa"
+        padding: "16px 8px",
+        background: isDark ? "#141414" : "#f5f7fb",
+        display: "flex",
+        flexDirection: "column",
       }}
     >
-      <List
-        dataSource={messages}
-        renderItem={(msg, index) => {
+      {/* Empty state */}
+      {messages.length === 0 && !isLoading && (
+        <div style={{
+          flex: 1, display: "flex", flexDirection: "column",
+          justifyContent: "center", alignItems: "center", gap: 8,
+        }}>
+          <RobotOutlined style={{ fontSize: 40, color: "#aaa" }} />
+          <Text type="secondary" style={{ fontSize: 13 }}>
+            Start the conversation by typing a message below.
+          </Text>
+        </div>
+      )}
 
-          const isUser = msg.role === "user";
+      {messages.map((msg, i) => (
+        <MessageBox
+          key={msg.id || i}
+          role={msg.role}
+          message={msg.message}
+          attachmentUrl={msg.attachment_url}
+          attachmentType={msg.attachment_type}
+          tokensUsed={msg.tokens_used}
+        />
+      ))}
 
-          return (
-            <List.Item key={index} style={{ border: "none" }}>
+      {isLoading && <MessageBox role="assistant" message="" isLoading />}
 
-              <div
-                style={{
-                  display: "flex",
-                  width: "100%",
-                  justifyContent: isUser ? "flex-end" : "flex-start"
-                }}
-              >
-
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "10px",
-                    flexDirection: isUser ? "row-reverse" : "row",
-                    alignItems: "flex-start"
-                  }}
-                >
-
-                  <Avatar
-                    icon={isUser ? <UserOutlined /> : <RobotOutlined />}
-                  />
-
-                  <div
-                    style={{
-                      background: isUser ? "#1677ff" : "#f0f0f0",
-                      color: isUser ? "white" : "black",
-                      padding: "10px 14px",
-                      borderRadius: "10px",
-                      maxWidth: "600px",
-                      wordBreak: "break-word"
-                    }}
-                  >
-                    {msg.message}
-                  </div>
-
-                </div>
-
-              </div>
-
-            </List.Item>
-          );
-        }}
-      />
-
-      {/* Auto scroll target */}
       <div ref={bottomRef} />
-
     </div>
   );
 }

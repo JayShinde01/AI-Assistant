@@ -1,59 +1,110 @@
+/**
+ * components/ChatInput.jsx
+ * ------------------------
+ * Message input bar — dark/light aware, responsive.
+ */
+
 import React, { useState } from "react";
-import { Input, Button } from "antd";
-import { SendOutlined } from "@ant-design/icons";
+import { Input, Button, Tag, Tooltip } from "antd";
+import { SendOutlined, CloseOutlined, FileOutlined } from "@ant-design/icons";
+
+import FileUploadButton from "./FileUploadButton";
+import { UPLOADS_BASE_URL } from "../constants/config";
+import { useBreakpoint } from "../hooks/useBreakpoint";
+import { useTheme }      from "../context/ThemeContext";
 
 const { TextArea } = Input;
 
-function ChatInput({ onSend }) {
+function ChatInput({ onSend, isLoading = false }) {
+  const [message, setMessage]       = useState("");
+  const [attachment, setAttachment] = useState(null);
 
-  const [message, setMessage] = useState("");
+  const isMobile = useBreakpoint();
+  const { isDark } = useTheme();
 
-  const handleSend = () => {
-    if (!message.trim()) return;
-
-    onSend(message);
+  function handleSend() {
+    if (!message.trim() && !attachment) return;
+    onSend(message.trim(), attachment?.url || null, attachment?.mime_type || null);
     setMessage("");
-  };
+    setAttachment(null);
+  }
+
+  function handleKeyDown(e) {
+    if (!isMobile && e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  }
+
+  const isImage = attachment?.mime_type?.startsWith("image/");
 
   return (
-
     <div
       style={{
-        display: "flex",
-        width: "100%",
-        gap: "10px",
-        padding: "10px",
-        borderTop: "1px solid #eee",
-        background: "#fff"
+        borderTop: `1px solid ${isDark ? "#303030" : "#e8e8e8"}`,
+        background: isDark ? "#1a1a1a" : "#fff",
+        padding: isMobile ? "8px 10px" : "10px 16px",
+        flexShrink: 0,
       }}
     >
+      {/* Attachment preview */}
+      {attachment && (
+        <div style={{ marginBottom: 6 }}>
+          {isImage ? (
+            <div style={{ position: "relative", display: "inline-block" }}>
+              <img
+                src={`${UPLOADS_BASE_URL}/${attachment.url.split("/uploads/")[1]}`}
+                alt="attachment preview"
+                style={{
+                  maxHeight: isMobile ? 60 : 80, maxWidth: isMobile ? 140 : 200,
+                  borderRadius: 6, border: "1px solid #d9d9d9",
+                  objectFit: "cover", display: "block",
+                }}
+              />
+              <Button size="small" icon={<CloseOutlined />} onClick={() => setAttachment(null)}
+                style={{
+                  position: "absolute", top: -8, right: -8,
+                  borderRadius: "50%", padding: 0, width: 18, height: 18, minWidth: 18, fontSize: 9,
+                }}
+                aria-label="Remove attachment"
+              />
+            </div>
+          ) : (
+            <Tag icon={<FileOutlined />} closable onClose={() => setAttachment(null)} color="blue">
+              {attachment.original_name}
+            </Tag>
+          )}
+        </div>
+      )}
 
-      <TextArea
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        placeholder="Type your message..."
-        autoSize={{ minRows: 1, maxRows: 4 }}
-        style={{
-          flex: 1   // ⭐ This makes it full width
-        }}
-        onPressEnter={(e) => {
-          if (!e.shiftKey) {
-            e.preventDefault();
-            handleSend();
-          }
-        }}
-      />
+      {/* Input row */}
+      <div style={{ display: "flex", gap: isMobile ? 6 : 8, alignItems: "flex-end" }}>
+        <FileUploadButton onUploadComplete={setAttachment} disabled={isLoading} />
 
-      <Button
-        type="primary"
-        icon={<SendOutlined />}
-        onClick={handleSend}
-      >
-        Send
-      </Button>
+        <TextArea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={isLoading ? "Waiting for response…" : "Type a message…"}
+          autoSize={{ minRows: 1, maxRows: isMobile ? 3 : 4 }}
+          disabled={isLoading}
+          style={{ flex: 1, resize: "none" }}
+          aria-label="Message input"
+        />
 
+        <Tooltip title={isMobile ? "" : "Send (Enter)"}>
+          <Button
+            type="primary" icon={<SendOutlined />}
+            onClick={handleSend} loading={isLoading}
+            disabled={!message.trim() && !attachment}
+            style={{ flexShrink: 0 }}
+            aria-label="Send message"
+          >
+            {!isMobile && "Send"}
+          </Button>
+        </Tooltip>
+      </div>
     </div>
-
   );
 }
 
