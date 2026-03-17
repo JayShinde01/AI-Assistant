@@ -54,7 +54,7 @@ jobs:
         docker tag backend:$IMAGE_TAG $BACKEND_REPO:$IMAGE_TAG
         docker push $BACKEND_REPO:$IMAGE_TAG
 
-        # Update ECS task definition JSON dynamically
+        # Create backend task definition
         cat > backend-task-def.json <<EOF
 {
   "family": "ai-assistant-backend-task",
@@ -66,17 +66,14 @@ jobs:
       "cpu": 256,
       "essential": true,
       "portMappings": [
-        {
-          "containerPort": 8000,
-          "hostPort": 8000
-        }
+        { "containerPort": 8000, "hostPort": 8000 }
       ]
     }
   ]
 }
 EOF
 
-        # Register new task definition
+        # Register new task definition revision
         aws ecs register-task-definition --cli-input-json file://backend-task-def.json
 
         # Update ECS service
@@ -100,7 +97,7 @@ EOF
         docker tag frontend:$IMAGE_TAG $FRONTEND_REPO:$IMAGE_TAG
         docker push $FRONTEND_REPO:$IMAGE_TAG
 
-        # Update ECS task definition JSON dynamically
+        # Create frontend task definition
         cat > frontend-task-def.json <<EOF
 {
   "family": "ai-assistant-frontend-task",
@@ -112,17 +109,14 @@ EOF
       "cpu": 256,
       "essential": true,
       "portMappings": [
-        {
-          "containerPort": 80,
-          "hostPort": 80
-        }
+        { "containerPort": 80, "hostPort": 80 }
       ]
     }
   ]
 }
 EOF
 
-        # Register new task definition
+        # Register new task definition revision
         aws ecs register-task-definition --cli-input-json file://frontend-task-def.json
 
         # Update ECS service
