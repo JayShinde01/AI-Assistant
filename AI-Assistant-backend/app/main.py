@@ -77,7 +77,7 @@ app.include_router(upload_routes.router)     # /api/upload
 
 
 # ── Health check ──────────────────────────────────────────────────────────────
-@app.get("/", tags=["Health"])
+@app.get("/api/", tags=["Health"])
 def health_check():
     """
     Simple health check endpoint.
