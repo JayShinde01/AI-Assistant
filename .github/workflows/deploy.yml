@@ -74,7 +74,7 @@ jobs:
       run: |
         aws ecs update-service \
           --cluster ai-assistant-cluster \
-          --service ai-assistant-backend-service \
+          --service ai-assistant-backend-task-service-owwbgu4b \
           --force-new-deployment
 
     # ---------------------------
@@ -84,5 +84,5 @@ jobs:
       run: |
         aws ecs update-service \
           --cluster ai-assistant-cluster \
-          --service ai-assistant-frontend-service \
+          --service ai-assistant-frontend-task-service-63gyo9ee \
           --force-new-deployment
