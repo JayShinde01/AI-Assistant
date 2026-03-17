@@ -53,12 +53,17 @@ Base.metadata.create_all(bind=engine)
 #
 # ⚠️  In production, replace "*" with your actual frontend domain:
 #     allow_origins=["https://your-app.com"]
+origins = [
+    "https://ai-assistant-task.netlify.app",
+    "https://d2u4urhbthj015.cloudfront.net"
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://ai-assistant-frontend-9qwn.onrender.com"],          # Allow all origins (restrict in production)
+    allow_origins=origins,  # or ["*"] for testing
     allow_credentials=True,
-    allow_methods=["*"],          # Allow GET, POST, PUT, DELETE, etc.
-    allow_headers=["*"],          # Allow all headers including Authorization
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # ── Static file serving ───────────────────────────────────────────────────────
