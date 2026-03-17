@@ -55,7 +55,7 @@ Base.metadata.create_all(bind=engine)
 #     allow_origins=["https://your-app.com"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          # Allow all origins (restrict in production)
+    allow_origins=["https://ai-assistant-frontend-9qwn.onrender.com"],          # Allow all origins (restrict in production)
     allow_credentials=True,
     allow_methods=["*"],          # Allow GET, POST, PUT, DELETE, etc.
     allow_headers=["*"],          # Allow all headers including Authorization
