@@ -32,7 +32,7 @@ jobs:
         aws-region: ${{ secrets.AWS_REGION }}
 
     # ---------------------------
-    # 3. Login to ECR (backend + frontend)
+    # 3. Login to ECR
     # ---------------------------
     - name: Login to ECR (backend)
       run: |
@@ -47,24 +47,48 @@ jobs:
     # ---------------------------
     # 4. Build & Push Backend Image
     # ---------------------------
-    - name: Build backend image
+    - name: Build & Push Backend Image
       run: |
         IMAGE_TAG=${GITHUB_SHA}
         docker build -t backend:$IMAGE_TAG ./AI-Assistant-backend
         docker tag backend:$IMAGE_TAG $BACKEND_REPO:$IMAGE_TAG
         docker push $BACKEND_REPO:$IMAGE_TAG
 
-        # Update ECS service with new image
+        # Update ECS task definition JSON dynamically
+        cat > backend-task-def.json <<EOF
+{
+  "family": "ai-assistant-backend-task",
+  "containerDefinitions": [
+    {
+      "name": "backend",
+      "image": "$BACKEND_REPO:$IMAGE_TAG",
+      "memory": 512,
+      "cpu": 256,
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "hostPort": 8000
+        }
+      ]
+    }
+  ]
+}
+EOF
+
+        # Register new task definition
+        aws ecs register-task-definition --cli-input-json file://backend-task-def.json
+
+        # Update ECS service
         aws ecs update-service \
           --cluster vibrant-rabbit-py1eqp \
           --service ai-assistant-backend-task-service-owwbgu4b \
-          --force-new-deployment \
-          --image $BACKEND_REPO:$IMAGE_TAG
+          --force-new-deployment
 
     # ---------------------------
     # 5. Build & Push Frontend Image
     # ---------------------------
-    - name: Build frontend image
+    - name: Build & Push Frontend Image
       run: |
         IMAGE_TAG=${GITHUB_SHA}
         docker build \
@@ -76,9 +100,33 @@ jobs:
         docker tag frontend:$IMAGE_TAG $FRONTEND_REPO:$IMAGE_TAG
         docker push $FRONTEND_REPO:$IMAGE_TAG
 
-        # Update ECS service with new image
+        # Update ECS task definition JSON dynamically
+        cat > frontend-task-def.json <<EOF
+{
+  "family": "ai-assistant-frontend-task",
+  "containerDefinitions": [
+    {
+      "name": "frontend",
+      "image": "$FRONTEND_REPO:$IMAGE_TAG",
+      "memory": 512,
+      "cpu": 256,
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 80,
+          "hostPort": 80
+        }
+      ]
+    }
+  ]
+}
+EOF
+
+        # Register new task definition
+        aws ecs register-task-definition --cli-input-json file://frontend-task-def.json
+
+        # Update ECS service
         aws ecs update-service \
           --cluster vibrant-rabbit-py1eqp \
           --service ai-assistant-frontend-task-service-63gyo9ee \
-          --force-new-deployment \
-          --image $FRONTEND_REPO:$IMAGE_TAG
+          --force-new-deployment
