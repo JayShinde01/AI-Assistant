@@ -111,6 +111,40 @@ body {
   30%            { transform: translateY(-4px); opacity: 1; }
 }
 
+/* ── Streaming cursor — blinks while AI is typing ────────────────────────── */
+.streaming-cursor {
+  display: inline-block;
+  animation: blink-cursor 0.7s step-end infinite;
+  font-weight: 300;
+  color: #1677ff;
+  margin-left: 1px;
+}
+
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+/* ── Message entrance animation ──────────────────────────────────────────── */
+.message-enter {
+  animation: fadeSlideIn 0.25s ease-out both;
+}
+
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Welcome icon float animation ────────────────────────────────────────── */
+.welcome-icon {
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-8px); }
+}
+
 /* ── Mobile responsive ────────────────────────────────────────────────────── */
 @media (max-width: 767px) {
   .markdown-body { font-size: 13px; }

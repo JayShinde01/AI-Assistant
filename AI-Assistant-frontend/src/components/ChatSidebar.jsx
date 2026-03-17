@@ -1,10 +1,10 @@
 /**
  * components/ChatSidebar.jsx
  * --------------------------
- * Left sidebar — dark/light aware, with theme toggle at the bottom.
+ * Left sidebar — chat list with search, dark/light aware.
  */
 
-import React, { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Button, Menu, Modal, Input, Space, Avatar,
@@ -13,7 +13,7 @@ import {
 import {
   MessageOutlined, DeleteOutlined, EditOutlined,
   PlusOutlined, LogoutOutlined, ThunderboltOutlined,
-  BulbOutlined, BulbFilled,
+  BulbOutlined, BulbFilled, SearchOutlined,
 } from "@ant-design/icons";
 
 import ModelSelector from "./ModelSelector";
@@ -27,6 +27,7 @@ const { Text } = Typography;
 function ChatSidebar({ onNavigate }) {
   const [chats, setChats]                   = useState([]);
   const [loading, setLoading]               = useState(false);
+  const [searchQuery, setSearchQuery]       = useState("");
   const [newChatVisible, setNewChatVisible] = useState(false);
   const [renameVisible, setRenameVisible]   = useState(false);
   const [selectedChatId, setSelectedChatId] = useState(null);
@@ -75,6 +76,11 @@ function ChatSidebar({ onNavigate }) {
     } catch { message.error("Failed to rename chat"); }
   }
 
+  // Filter chats by search query
+  const filteredChats = chats.filter((c) =>
+    c.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div style={{
       display: "flex", flexDirection: "column", height: "100%",
@@ -91,8 +97,8 @@ function ChatSidebar({ onNavigate }) {
 
       <Divider style={{ margin: "0 0 10px 0" }} />
 
-      {/* Actions */}
-      <Space direction="vertical" style={{ width: "100%", marginBottom: 8 }}>
+      {/* Action buttons */}
+      <Space style={{ width: "100%", marginBottom: 8, flexDirection: "column", gap: 6 }}>
         <Button type="primary" icon={<PlusOutlined />} block onClick={() => setNewChatVisible(true)}>
           New Chat
         </Button>
@@ -106,15 +112,31 @@ function ChatSidebar({ onNavigate }) {
 
       <Divider style={{ margin: "8px 0" }} />
 
+      {/* Search input */}
+      <Input
+        prefix={<SearchOutlined style={{ color: "#aaa" }} />}
+        placeholder="Search chats…"
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        allowClear
+        size="small"
+        style={{ marginBottom: 8 }}
+      />
+
       {/* Chat list */}
       <div style={{ flex: 1, overflowY: "auto" }}>
+        {filteredChats.length === 0 && (
+          <Text type="secondary" style={{ fontSize: 12, padding: "8px 4px", display: "block" }}>
+            {searchQuery ? "No chats match your search." : "No chats yet. Create one above."}
+          </Text>
+        )}
         <Menu
           mode="inline"
           theme={isDark ? "dark" : "light"}
           selectedKeys={chatId ? [chatId] : []}
           onClick={({ key }) => { navigate(`/chat/${key}`); onNavigate?.(); }}
           style={{ border: "none", background: "transparent" }}
-          items={chats.map((chat) => ({
+          items={filteredChats.map((chat) => ({
             key: chat.id,
             icon: <MessageOutlined />,
             label: (
@@ -145,7 +167,7 @@ function ChatSidebar({ onNavigate }) {
       <Divider style={{ margin: "8px 0" }} />
 
       {/* Theme toggle + logout */}
-      <Space direction="vertical" style={{ width: "100%" }}>
+      <Space style={{ width: "100%", flexDirection: "column", gap: 6 }}>
         <Button
           block icon={isDark ? <BulbFilled style={{ color: "#faad14" }} /> : <BulbOutlined />}
           onClick={toggleTheme}
@@ -160,7 +182,7 @@ function ChatSidebar({ onNavigate }) {
       {/* New Chat Modal */}
       <Modal title="Create New Chat" open={newChatVisible} onOk={handleCreateChat}
         onCancel={() => setNewChatVisible(false)} confirmLoading={loading} okText="Create">
-        <Space direction="vertical" style={{ width: "100%" }}>
+        <Space style={{ width: "100%", flexDirection: "column", gap: 8 }}>
           <Text>Choose an AI model for this chat:</Text>
           <ModelSelector value={selectedModel} onChange={setSelectedModel} />
           <Text type="secondary" style={{ fontSize: 12 }}>

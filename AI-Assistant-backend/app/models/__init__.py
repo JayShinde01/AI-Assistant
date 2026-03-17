@@ -11,5 +11,6 @@ Example:
 from app.models.user import User
 from app.models.chat_session import ChatSession
 from app.models.message import Message
+from app.models.activity_log import ActivityLog
 
-__all__ = ["User", "ChatSession", "Message"]
+__all__ = ["User", "ChatSession", "Message", "ActivityLog"]

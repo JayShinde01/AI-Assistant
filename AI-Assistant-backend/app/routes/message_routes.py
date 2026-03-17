@@ -4,13 +4,16 @@ routes/message_routes.py
 Routes for sending and retrieving messages within a chat session.
 
 Endpoints:
-  GET  /api/chats/{chat_id}/messages  → Load chat history
-  POST /api/chats/{chat_id}/messages  → Send a message and get AI reply
-  POST /api/chats/temp                → Stateless temp chat (no DB storage)
+  GET  /api/chats/{chat_id}/messages         → Load chat history
+  POST /api/chats/{chat_id}/messages         → Send message, get AI reply (normal)
+  POST /api/chats/{chat_id}/messages/stream  → Send message, stream AI reply (live typing)
+  POST /api/chats/temp                       → Stateless temp chat (no DB storage)
 """
 
+import json
 import logging
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from uuid import UUID
 
@@ -19,13 +22,13 @@ from app.models.user import User
 from app.models.message import Message
 from app.models.chat_session import ChatSession
 from app.schemas.message_schema import (
-    MessageCreate,
-    MessageResponse,
-    AIReply,
-    TempChatRequest,
-    TempChatReply,
+    MessageCreate, MessageResponse, AIReply,
+    TempChatRequest, TempChatReply,
 )
-from app.services.gemini_service import generate_ai_response, generate_temp_response
+from app.services.gemini_service import (
+    generate_ai_response, generate_temp_response, generate_ai_stream,
+)
+from app.services.log_service import write_log
 from app.utils.get_current_user import get_current_user
 from app.config import MAX_HISTORY_MESSAGES
 
@@ -40,12 +43,7 @@ def get_messages(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Return all messages in a chat session, ordered oldest → newest.
-
-    This is called when the user opens a chat to load the full history.
-    """
-    # Verify the chat belongs to the current user
+    """Load all messages in a chat, ordered oldest → newest."""
     chat = (
         db.query(ChatSession)
         .filter(ChatSession.id == chat_id, ChatSession.user_id == current_user.id)
@@ -54,13 +52,12 @@ def get_messages(
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
 
-    messages = (
+    return (
         db.query(Message)
         .filter(Message.chat_id == chat_id)
         .order_by(Message.created_at)
         .all()
     )
-    return messages
 
 
 @router.post("/{chat_id}/messages", response_model=AIReply)
@@ -71,21 +68,16 @@ def send_message(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Send a user message and receive an AI-generated reply.
+    Send a user message and get a full AI reply (non-streaming).
 
     Flow:
-      1. Validate the chat belongs to the current user
-      2. Save the user's message to the database
-      3. Fetch the last N messages for context (token-efficient)
-      4. Call the Gemini API with the conversation history
-      5. Save the AI reply to the database
-      6. Return the reply + token usage to the frontend
-
-    The MAX_HISTORY_MESSAGES limit keeps token usage low by only sending
-    recent context to the AI instead of the entire conversation.
+      1. Validate chat ownership
+      2. Save user message
+      3. Fetch last N messages for context (keeps token usage low)
+      4. Call Gemini API
+      5. Save AI reply
+      6. Log the interaction to DB
     """
-
-    # ── Step 1: Validate chat ownership ───────────────────────────────────────
     chat = (
         db.query(ChatSession)
         .filter(ChatSession.id == chat_id, ChatSession.user_id == current_user.id)
@@ -97,7 +89,7 @@ def send_message(
     if not body.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
-    # ── Step 2: Save the user's message ───────────────────────────────────────
+    # Save user message
     user_message = Message(
         chat_id=chat_id,
         role="user",
@@ -109,9 +101,7 @@ def send_message(
     db.commit()
     db.refresh(user_message)
 
-    # ── Step 3: Fetch recent history for context ───────────────────────────────
-    # We limit to MAX_HISTORY_MESSAGES to control token usage.
-    # Fetching desc then reversing gives us the most recent N messages in order.
+    # Fetch recent history — limit to MAX_HISTORY_MESSAGES to save tokens
     recent_messages = (
         db.query(Message)
         .filter(Message.chat_id == chat_id)
@@ -119,15 +109,20 @@ def send_message(
         .limit(MAX_HISTORY_MESSAGES)
         .all()
     )
-    recent_messages.reverse()  # Put back in chronological order
+    recent_messages.reverse()
 
-    # ── Step 4: Call Gemini API ────────────────────────────────────────────────
-    ai_text, tokens_used = generate_ai_response(
-        messages=recent_messages,
-        model_name=chat.model,  # Use the model selected for this chat
-    )
+    # Call Gemini
+    try:
+        ai_text, tokens_used = generate_ai_response(
+            messages=recent_messages,
+            model_name=chat.model,
+        )
+    except Exception as e:
+        write_log(db, event="ai_error", level="ERROR", user_email=current_user.email,
+                  detail=str(e))
+        raise HTTPException(status_code=500, detail="AI service error")
 
-    # ── Step 5: Save the AI reply ──────────────────────────────────────────────
+    # Save AI reply
     ai_message = Message(
         chat_id=chat_id,
         role="assistant",
@@ -138,14 +133,106 @@ def send_message(
     db.commit()
     db.refresh(ai_message)
 
-    logger.info(
-        f"Message sent in chat {chat_id} | Model: {chat.model} | Tokens: {tokens_used}"
+    # Log the interaction — helpful for debugging and usage tracking
+    write_log(
+        db, event="ai_response", level="INFO",
+        user_email=current_user.email,
+        detail=f"model={chat.model} tokens={tokens_used} chat={chat_id}",
     )
 
-    return AIReply(
-        reply=ai_text,
+    logger.info(f"Message sent | chat={chat_id} | model={chat.model} | tokens={tokens_used}")
+
+    return AIReply(reply=ai_text, chat_id=chat_id, tokens_used=tokens_used)
+
+
+@router.post("/{chat_id}/messages/stream")
+def stream_message(
+    chat_id: UUID,
+    body: MessageCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Stream an AI reply chunk by chunk — gives the live typing effect like ChatGPT.
+
+    The frontend reads this as a Server-Sent Events (SSE) stream.
+    Each chunk is a JSON line: {"chunk": "..."} or {"done": true, "tokens": N}
+
+    Flow:
+      1. Save user message to DB
+      2. Start streaming from Gemini
+      3. Collect full reply while streaming
+      4. After stream ends, save the full AI reply to DB
+    """
+    chat = (
+        db.query(ChatSession)
+        .filter(ChatSession.id == chat_id, ChatSession.user_id == current_user.id)
+        .first()
+    )
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    if not body.message.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    # Save user message first
+    user_message = Message(
         chat_id=chat_id,
-        tokens_used=tokens_used,
+        role="user",
+        message=body.message,
+        attachment_url=body.attachment_url,
+        attachment_type=body.attachment_type,
+    )
+    db.add(user_message)
+    db.commit()
+
+    # Fetch recent history for context
+    recent_messages = (
+        db.query(Message)
+        .filter(Message.chat_id == chat_id)
+        .order_by(Message.created_at.desc())
+        .limit(MAX_HISTORY_MESSAGES)
+        .all()
+    )
+    recent_messages.reverse()
+
+    def event_generator():
+        """
+        Generator that streams chunks to the frontend.
+        After all chunks are sent, saves the full reply to the DB.
+        """
+        full_reply = []
+
+        for chunk in generate_ai_stream(messages=recent_messages, model_name=chat.model):
+            full_reply.append(chunk)
+            # Send each chunk as a JSON line — frontend parses this
+            yield json.dumps({"chunk": chunk}) + "\n"
+
+        # Stream is done — save the complete reply to DB
+        complete_text = "".join(full_reply)
+        ai_message = Message(
+            chat_id=chat_id,
+            role="assistant",
+            message=complete_text,
+            tokens_used=0,  # Streaming doesn't return token count easily
+        )
+        db.add(ai_message)
+        db.commit()
+
+        # Log it
+        write_log(
+            db, event="ai_stream_response", level="INFO",
+            user_email=current_user.email,
+            detail=f"model={chat.model} chat={chat_id} chars={len(complete_text)}",
+        )
+
+        # Tell the frontend the stream is complete
+        yield json.dumps({"done": True}) + "\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/plain",
+        headers={"X-Accel-Buffering": "no"},  # Disable nginx buffering for real-time streaming
     )
 
 
@@ -155,14 +242,8 @@ def temp_chat(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Stateless / temporary chat — no messages are saved to the database.
-
-    Use this for quick one-off questions where the user doesn't want
-    to create a persistent chat session. The frontend manages the
-    conversation history locally and sends it with each request.
-
-    This is more token-efficient for short conversations since we don't
-    load history from the database.
+    Stateless temp chat — nothing is saved to the database.
+    The frontend manages history locally and sends it with each request.
     """
     if not body.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")

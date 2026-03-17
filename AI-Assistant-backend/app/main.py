@@ -23,6 +23,7 @@ import os
 
 from app.database import Base, engine
 from app.routes import auth_routes, chat_routes, message_routes, upload_routes
+import app.models  # noqa: F401 — ensures ActivityLog and all models are registered with Base
 
 # ── Logging setup ─────────────────────────────────────────────────────────────
 # Configure basic logging so we can see info/warning/error messages in the console
@@ -55,7 +56,7 @@ Base.metadata.create_all(bind=engine)
 #     allow_origins=["https://your-app.com"]
 origins = [
     "https://ai-assistant-task.netlify.app",
-    "https://d2u4urhbthj015.cloudfront.net"
+    "http://localhost:5173"
 ]
 
 app.add_middleware(
@@ -86,7 +87,32 @@ app.include_router(upload_routes.router)     # /api/upload
 def health_check():
     """
     Simple health check endpoint.
-    Returns a 200 OK with a status message.
-    Used by load balancers and monitoring tools to verify the server is running.
+    Returns 200 OK — used by load balancers and monitoring tools.
     """
     return {"status": "ok", "message": "AI Assistant Backend is running"}
+
+
+@app.get("/api/logs", tags=["Logs"])
+def get_logs(
+    limit: int = 100,
+    db=__import__("fastapi").Depends(__import__("app.database", fromlist=["get_db"]).get_db),
+):
+    """
+    View the most recent activity logs.
+    Useful for debugging after a server restart or checking who logged in.
+    Returns the latest `limit` log entries (default 100), newest first.
+    """
+    from app.models.activity_log import ActivityLog
+    from app.utils.get_current_user import get_current_user
+    logs = db.query(ActivityLog).order_by(ActivityLog.created_at.desc()).limit(limit).all()
+    return [
+        {
+            "id": str(log.id),
+            "level": log.level,
+            "event": log.event,
+            "user_email": log.user_email,
+            "detail": log.detail,
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+        }
+        for log in logs
+    ]

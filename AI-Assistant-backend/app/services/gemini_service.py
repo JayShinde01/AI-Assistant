@@ -22,8 +22,7 @@ from typing import Optional
 import google.generativeai as genai
 
 from app.config import GEMINI_API_KEY
-for model in genai.list_models():
-    print(model.name)
+
 logger = logging.getLogger(__name__)
 
 # ── Configure Gemini with our API key ─────────────────────────────────────────
@@ -221,3 +220,56 @@ def generate_temp_response(
     except Exception as e:
         logger.error(f"Gemini temp chat error: {e}")
         return "Sorry, the AI service is temporarily unavailable.", 0
+
+
+def generate_ai_stream(
+    messages: list,
+    model_name: str = DEFAULT_MODEL,
+    attachment_data: Optional[bytes] = None,
+    attachment_mime: Optional[str] = None,
+):
+    """
+    Stream an AI response chunk by chunk — like ChatGPT's typing effect.
+
+    This is a generator function. Each yield is a small piece of the response text.
+    The caller (StreamingResponse) sends each chunk to the frontend as it arrives.
+
+    Args:
+        messages:        List of Message ORM objects (oldest → newest).
+        model_name:      Which Gemini model to use.
+        attachment_data: Raw bytes of an uploaded file/image (optional).
+        attachment_mime: MIME type of the attachment (optional).
+
+    Yields:
+        str — small text chunks from the AI response.
+    """
+    try:
+        model = _get_model(model_name)
+
+        # Build conversation history (same format as non-streaming)
+        prompt_parts = []
+        for msg in messages:
+            gemini_role = "user" if msg.role == "user" else "model"
+            prompt_parts.append({"role": gemini_role, "parts": [msg.message]})
+
+        # Attach file/image to the last user message if provided
+        if attachment_data and attachment_mime and prompt_parts:
+            last_msg = prompt_parts[-1]
+            if last_msg["role"] == "user":
+                last_msg["parts"].append({
+                    "inline_data": {
+                        "mime_type": attachment_mime,
+                        "data": base64.b64encode(attachment_data).decode("utf-8"),
+                    }
+                })
+
+        # stream=True tells Gemini to send chunks as they're generated
+        response = model.generate_content(prompt_parts, stream=True)
+
+        for chunk in response:
+            if chunk.text:
+                yield chunk.text
+
+    except Exception as e:
+        logger.error(f"Gemini stream error: {e}")
+        yield "Sorry, the AI service is temporarily unavailable."
