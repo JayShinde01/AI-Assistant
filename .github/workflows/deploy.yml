@@ -15,15 +15,9 @@ jobs:
       FRONTEND_REPO: ${{ secrets.ECR_FRONTEND_REPO }}
 
     steps:
-    # ---------------------------
-    # 1. Checkout code
-    # ---------------------------
     - name: Checkout code
       uses: actions/checkout@v3
 
-    # ---------------------------
-    # 2. Configure AWS credentials
-    # ---------------------------
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v2
       with:
@@ -31,9 +25,6 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ secrets.AWS_REGION }}
 
-    # ---------------------------
-    # 3. Login to ECR (backend + frontend)
-    # ---------------------------
     - name: Login to ECR (backend)
       run: |
         aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
@@ -44,18 +35,12 @@ jobs:
         aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
         docker login --username AWS --password-stdin ${{ env.FRONTEND_REPO }}
 
-    # ---------------------------
-    # 4. Build & Push Backend Image
-    # ---------------------------
     - name: Build backend image
       run: |
         docker build -t backend ./AI-Assistant-backend
         docker tag backend:latest $BACKEND_REPO:latest
         docker push $BACKEND_REPO:latest
 
-    # ---------------------------
-    # 5. Build & Push Frontend Image
-    # ---------------------------
     - name: Build frontend image
       run: |
         docker build \
@@ -67,9 +52,6 @@ jobs:
         docker tag frontend:latest $FRONTEND_REPO:latest
         docker push $FRONTEND_REPO:latest
 
-    # ---------------------------
-    # 6. Deploy Backend to ECS
-    # ---------------------------
     - name: Deploy backend to ECS
       run: |
         aws ecs update-service \
@@ -77,9 +59,6 @@ jobs:
           --service ai-assistant-backend-task-service-owwbgu4b \
           --force-new-deployment
 
-    # ---------------------------
-    # 7. Deploy Frontend to ECS
-    # ---------------------------
     - name: Deploy frontend to ECS
       run: |
         aws ecs update-service \
