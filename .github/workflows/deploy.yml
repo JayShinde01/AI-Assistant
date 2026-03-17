@@ -15,9 +15,15 @@ jobs:
       FRONTEND_REPO: ${{ secrets.ECR_FRONTEND_REPO }}
 
     steps:
+    # ---------------------------
+    # 1. Checkout code
+    # ---------------------------
     - name: Checkout code
       uses: actions/checkout@v3
 
+    # ---------------------------
+    # 2. Configure AWS credentials
+    # ---------------------------
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v2
       with:
@@ -25,6 +31,9 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ secrets.AWS_REGION }}
 
+    # ---------------------------
+    # 3. Login to ECR (backend + frontend)
+    # ---------------------------
     - name: Login to ECR (backend)
       run: |
         aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
@@ -35,33 +44,41 @@ jobs:
         aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
         docker login --username AWS --password-stdin ${{ env.FRONTEND_REPO }}
 
+    # ---------------------------
+    # 4. Build & Push Backend Image
+    # ---------------------------
     - name: Build backend image
       run: |
-        docker build -t backend ./AI-Assistant-backend
-        docker tag backend:latest $BACKEND_REPO:latest
-        docker push $BACKEND_REPO:latest
+        IMAGE_TAG=${GITHUB_SHA}
+        docker build -t backend:$IMAGE_TAG ./AI-Assistant-backend
+        docker tag backend:$IMAGE_TAG $BACKEND_REPO:$IMAGE_TAG
+        docker push $BACKEND_REPO:$IMAGE_TAG
 
+        # Update ECS service with new image
+        aws ecs update-service \
+          --cluster vibrant-rabbit-py1eqp \
+          --service ai-assistant-backend-task-service-owwbgu4b \
+          --force-new-deployment \
+          --image $BACKEND_REPO:$IMAGE_TAG
+
+    # ---------------------------
+    # 5. Build & Push Frontend Image
+    # ---------------------------
     - name: Build frontend image
       run: |
+        IMAGE_TAG=${GITHUB_SHA}
         docker build \
           --build-arg VITE_GOOGLE_CLIENT_ID=${{ secrets.VITE_GOOGLE_CLIENT_ID }} \
           --build-arg VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }} \
           --build-arg VITE_UPLOADS_BASE_URL=${{ secrets.VITE_UPLOADS_BASE_URL }} \
-          -t frontend ./AI-Assistant-frontend
+          -t frontend:$IMAGE_TAG ./AI-Assistant-frontend
 
-        docker tag frontend:latest $FRONTEND_REPO:latest
-        docker push $FRONTEND_REPO:latest
+        docker tag frontend:$IMAGE_TAG $FRONTEND_REPO:$IMAGE_TAG
+        docker push $FRONTEND_REPO:$IMAGE_TAG
 
-    - name: Deploy backend to ECS
-      run: |
-        aws ecs update-service \
-          --cluster vibrant-rabbit-py1eqp \
-          --service ai-assistant-backend-task-service-owwbgu4b \
-          --force-new-deployment
-
-    - name: Deploy frontend to ECS
-      run: |
+        # Update ECS service with new image
         aws ecs update-service \
           --cluster vibrant-rabbit-py1eqp \
           --service ai-assistant-frontend-task-service-63gyo9ee \
-          --force-new-deployment
+          --force-new-deployment \
+          --image $FRONTEND_REPO:$IMAGE_TAG
