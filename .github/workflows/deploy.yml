@@ -73,7 +73,7 @@ jobs:
     - name: Deploy backend to ECS
       run: |
         aws ecs update-service \
-          --cluster ai-assistant-cluster \
+          --cluster vibrant-rabbit-py1eqp \
           --service ai-assistant-backend-task-service-owwbgu4b \
           --force-new-deployment
 
@@ -83,6 +83,6 @@ jobs:
     - name: Deploy frontend to ECS
       run: |
         aws ecs update-service \
-          --cluster ai-assistant-cluster \
+          --cluster vibrant-rabbit-py1eqp \
           --service ai-assistant-frontend-task-service-63gyo9ee \
           --force-new-deployment
