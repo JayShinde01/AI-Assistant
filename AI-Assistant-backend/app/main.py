@@ -57,7 +57,7 @@ Base.metadata.create_all(bind=engine)
 origins = [
     "https://ai-assistant-task.netlify.app",
     "http://localhost:5173",
-    "https://jayshinde.tech"
+    "https://ai.jayshinde.tech"
 ]
 
 app.add_middleware(
