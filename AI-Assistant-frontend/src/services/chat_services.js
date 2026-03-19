@@ -75,8 +75,10 @@ export async function streamMessage(
   // ✅ Correct way to get token (interceptor does NOT work with fetch)
   const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
 
-  const baseUrl =
-    import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
+  const baseUrl = import.meta.env.VITE_API_BASE_URL.replace(
+    "http://",
+    "https://"
+  );
 
   const response = await fetch(
     `${baseUrl}/chats/${chatId}/messages/stream`,
