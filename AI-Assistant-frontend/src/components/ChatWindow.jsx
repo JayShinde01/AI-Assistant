@@ -17,6 +17,8 @@ function ChatWindow({ messages, isLoading = false, isStreaming = false, onRegene
   const bottomRef = useRef(null);
   const { isDark } = useTheme();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  console.log("chatwindows",messages);
+  
 
   // Auto-scroll to bottom when new messages arrive or stream updates
   useEffect(() => {
