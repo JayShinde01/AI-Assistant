@@ -56,7 +56,8 @@ Base.metadata.create_all(bind=engine)
 #     allow_origins=["https://your-app.com"]
 origins = [
     "https://ai-assistant-task.netlify.app",
-    "http://localhost:5173"
+    "http://localhost:5173",
+    "https://jayshinde.tech"
 ]
 
 app.add_middleware(
