@@ -18,7 +18,6 @@ const API = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000, // 30 second timeout — AI responses can take a moment
 });
-console.log("env",API_BASE_URL);
 
 // ── Request Interceptor ───────────────────────────────────────────────────────
 // Runs before every request is sent.
