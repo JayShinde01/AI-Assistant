@@ -24,7 +24,7 @@ import ChatWindow    from "../components/ChatWindow";
 import ChatInput     from "../components/ChatInput";
 import ModelSelector from "../components/ModelSelector";
 
-import { loadMessages, streamMessage, createChat } from "../services/chat_services";
+import { loadMessages, streamMessage, createChat, autoTitle } from "../services/chat_services";
 import { useChatModel }  from "../context/ChatModelContext";
 import { useTheme }      from "../context/ThemeContext";
 import { useBreakpoint } from "../hooks/useBreakpoint";
@@ -61,64 +61,86 @@ function Home() {
     setDrawerOpen(false);
   }, [fetchMessages]);
 
-  // ── Send message with live streaming ─────────────────────────────────────
+  // ── Send message with}} live streaming ─────────────────────────────────────
   async function handleSend(text, attachmentUrl, attachmentType) {
-    if (!chatId || isStreaming) return;
+  if (!chatId || isStreaming) return;
 
-    // Add user message immediately (optimistic)
-    const userMsg = {
-      id: `user-${Date.now()}`, role: "user",
-      message: text, attachment_url: attachmentUrl, attachment_type: attachmentType,
-    };
-    // Placeholder for the AI reply that will be filled in chunk by chunk
-    const aiPlaceholder = {
-      id: `ai-${Date.now()}`, role: "assistant",
-      message: "", isStreaming: true,
-    };
+  const isFirstMessage = messages.length === 0;
 
-    setMessages((prev) => [...prev, userMsg, aiPlaceholder]);
-    setIsLoading(true);
-    setIsStreaming(true);
+  const userMsg = {
+    id: `user-${Date.now()}`,
+    role: "user",
+    message: text,
+    attachment_url: attachmentUrl,
+    attachment_type: attachmentType,
+  };
 
-    try {
-      await streamMessage(
-        chatId, text,
-        // onChunk — append each piece of text to the last message
-        (chunk) => {
-          setMessages((prev) => {
-            const updated = [...prev];
-            const last = updated[updated.length - 1];
-            if (last?.isStreaming) {
-              updated[updated.length - 1] = { ...last, message: last.message + chunk };
-            }
-            return updated;
-          });
-        },
-        // onDone — mark streaming as complete
-        () => {
-          setMessages((prev) => {
-            const updated = [...prev];
-            const last = updated[updated.length - 1];
-            if (last?.isStreaming) {
-              updated[updated.length - 1] = { ...last, isStreaming: false };
-            }
-            return updated;
-          });
-          setIsStreaming(false);
-          setIsLoading(false);
-        },
-        attachmentUrl,
-        attachmentType,
-      );
-    } catch {
-      antMessage.error("Failed to send message. Please try again.");
-      // Remove the optimistic messages on error
-      setMessages((prev) => prev.filter((m) => m.id !== userMsg.id && m.id !== aiPlaceholder.id));
-      setIsStreaming(false);
-      setIsLoading(false);
-    }
+  const aiPlaceholder = {
+    id: `ai-${Date.now()}`,
+    role: "assistant",
+    message: "",
+    isStreaming: true,
+  };
+
+  setMessages((prev) => [...prev, userMsg, aiPlaceholder]);
+  setIsLoading(true);
+  setIsStreaming(true);
+
+  try {
+    await streamMessage(
+      chatId,
+      text,
+      (chunk) => {
+        setMessages((prev) => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last?.isStreaming) {
+            updated[updated.length - 1] = {
+              ...last,
+              message: last.message + chunk,
+            };
+          }
+          return updated;
+        });
+      },
+      async () => {
+        // ✅ AFTER first message response is done
+        if (isFirstMessage) {
+          try {
+            const title = await autoTitle(chatId);
+            console.log("Auto-generated title:", title);
+          } catch (err) {
+            console.error("Auto title failed:", err);
+          }
+        }
+
+        setMessages((prev) => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last?.isStreaming) {
+            updated[updated.length - 1] = {
+              ...last,
+              isStreaming: false,
+            };
+          }
+          return updated;
+        });
+
+        setIsStreaming(false);
+        setIsLoading(false);
+      },
+      attachmentUrl,
+      attachmentType
+    );
+  } catch {
+    antMessage.error("Failed to send message. Please try again.");
+    setMessages((prev) =>
+      prev.filter((m) => m.id !== userMsg.id && m.id !== aiPlaceholder.id)
+    );
+    setIsStreaming(false);
+    setIsLoading(false);
   }
-
+}
   // ── Regenerate last AI response ───────────────────────────────────────────
   async function handleRegenerate() {
     if (isStreaming || messages.length < 2) return;

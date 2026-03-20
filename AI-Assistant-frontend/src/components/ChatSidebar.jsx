@@ -148,15 +148,19 @@ function ChatSidebar({ onNavigate }) {
                   {chat.title}
                 </span>
                 <Space size={4}>
-                  <EditOutlined style={{ color: "#1677ff", fontSize: 12 }}
+               <Tooltip title="Rename Chat">
+                   <EditOutlined style={{ color: "#1677ff", fontSize: 12 }}
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedChatId(chat.id);
                       setNewTitle(chat.title);
                       setRenameVisible(true);
                     }} />
-                  <DeleteOutlined style={{ color: "#ff4d4f", fontSize: 12 }}
+               </Tooltip>
+                  <Tooltip title="Delete Chat">
+                    <DeleteOutlined style={{ color: "#ff4d4f", fontSize: 12 }}
                     onClick={(e) => { e.stopPropagation(); handleDelete(chat.id); }} />
+                  </Tooltip>
                 </Space>
               </div>
             ),
@@ -174,7 +178,7 @@ function ChatSidebar({ onNavigate }) {
         >
           {isDark ? "Light Mode" : "Dark Mode"}
         </Button>
-        <Button danger icon={<LogoutOutlined />} block onClick={() => handleLogout(navigate)}>
+         <Button danger icon={<LogoutOutlined />} block onClick={() => handleLogout(navigate)}>
           Logout
         </Button>
       </Space>

@@ -82,7 +82,7 @@ AVAILABLE_MODELS = {
 }
 
 # Default model — good balance of speed and token efficiency
-DEFAULT_MODEL = "models/gemini-2.0-flash-lite"
+DEFAULT_MODEL = "models/gemma-3-4b-it"
 
 
 def _get_model(model_name: str) -> genai.GenerativeModel:
@@ -273,3 +273,36 @@ def generate_ai_stream(
     except Exception as e:
         logger.error(f"Gemini stream error: {e}")
         yield "Sorry, the AI service is temporarily unavailable."
+
+
+def generate_title(msg: str) -> str:
+    try:
+        model = _get_model(DEFAULT_MODEL)
+
+        prompt = f"""
+        Generate a short 2-3 word title for this chat.
+        Only return the title, no explanation.
+
+        Message:
+        {msg}
+        """
+        print("in generate title1")
+
+        response = model.generate_content(prompt)
+        print("in generate title2")
+
+        title = response.text.strip()
+        print("in generate title",title)
+
+        # Safety cleanup
+        if not title:
+            return "New Chat"
+
+        # Optional: limit to 3 words
+        title = " ".join(title.split()[:3])
+
+        return title
+
+    except Exception as e:
+        logger.error(f"Gemini title generation error: {e}")
+        return "New Chat"

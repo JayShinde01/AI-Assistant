@@ -34,7 +34,12 @@ export async function renameChat(chatId, title) {
   const res = await API.put(`/chats/${chatId}`, { title });
   return res.data;
 }
-
+export async function autoTitle(chatId) {
+  res = await API.put(`/chats/autotitle/${chatId}`);
+  console.log(res);
+  
+  return res.data;
+}
 export async function onDeleteChat(chatId) {
   await API.delete(`/chats/${chatId}`);
 }
@@ -75,10 +80,7 @@ export async function streamMessage(
   // ✅ Correct way to get token (interceptor does NOT work with fetch)
   const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
 
-  const baseUrl = import.meta.env.VITE_API_BASE_URL.replace(
-    "http://",
-    "https://"
-  );
+  const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
   const response = await fetch(
     `${baseUrl}/chats/${chatId}/messages/stream`,

@@ -30,7 +30,7 @@ function MessageBox({
   role, message, attachmentUrl = null, attachmentType = null,
   tokensUsed = null, isLoading = false, isStreaming = false,
 }) {
-  console.log("messagebox",message);
+ 
   
   const isUser    = role === "user";
   const isMobile  = useBreakpoint();

@@ -18,9 +18,9 @@ from uuid import UUID
 from app.database import get_db
 from app.models.user import User
 from app.models.chat_session import ChatSession
-from app.schemas.chat_schema import ChatCreate, ChatResponse
+from app.schemas.chat_schema import AutoTitleResponse, ChatCreate, ChatResponse
 from app.utils.get_current_user import get_current_user
-
+from app.services.gemini_service import generate_title
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/chats", tags=["Chats"])
@@ -127,3 +127,59 @@ def delete_chat(
 
     logger.info(f"Chat {chat_id} deleted by user {current_user.email}")
     return {"message": "Chat deleted successfully"}
+
+
+@router.put("/autotitle/{chat_id}", response_model=AutoTitleResponse)
+def generate_chat_title(
+    chat_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # ── 1. Get chat ─────────────────────────────────────────────
+    db_chat = (
+        db.query(ChatSession)
+        .filter(
+            ChatSession.id == chat_id,
+            ChatSession.user_id == current_user.id
+        )
+        .first()
+    )
+
+    if not db_chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    # ── 2. Check messages exist ─────────────────────────────────
+    if not db_chat.messages:
+        raise HTTPException(status_code=400, detail="No messages found in this chat")
+
+    # ── 3. Get only USER messages (important) ───────────────────
+    user_messages = [m for m in db_chat.messages if m.role == "user"]
+
+    if not user_messages:
+        raise HTTPException(status_code=400, detail="No user messages found")
+
+    # ── 4. Sort by created_at (ensure first message) ────────────
+    first_message = sorted(user_messages, key=lambda x: x.created_at)[0]
+
+    # ── 5. Validate message content ─────────────────────────────
+    if not first_message.message:
+        raise HTTPException(status_code=400, detail="First message is empty")
+
+    first_prompt = first_message.message
+
+    # ── 6. Generate title ───────────────────────────────────────
+    generated_title = generate_title(first_prompt)
+    print(generate_title)
+    # fallback safety
+    if not generated_title or generated_title.strip() == "":
+        generated_title = "New Chat"
+
+    # ── 7. Save to DB ───────────────────────────────────────────
+    db_chat.title = generated_title
+
+    db.commit()
+    db.refresh(db_chat)
+    print(db_chat.title)
+
+    # ── 8. Return response ──────────────────────────────────────
+    return {"generated_title": generated_title}

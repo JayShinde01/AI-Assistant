@@ -38,3 +38,9 @@ class ChatResponse(BaseModel):
     class Config:
         # Allows Pydantic to read data from SQLAlchemy ORM objects directly
         from_attributes = True
+
+class AutoTitleResponse(BaseModel):
+    """
+    Request body for generating an automatic title for a chat session.
+    """
+    generated_title: str = Field(..., min_length=1, description="The first user message to generate a title from")
